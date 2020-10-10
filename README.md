@@ -6,4 +6,4 @@ have cut all the extra features except irc client-server interaction & all the w
 
 have been trying to port the remains from winsock to socket.h in Mint.
 
-have not yet finished. unclear about how to fetch mptcp api(wonder if it hadn't been created at all) 
+have not yet finished, but expected to wrap it up soon.
