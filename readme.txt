@@ -1,0 +1,1 @@
+Have cut all the extra features except IRC client-server socket interaction. Have been trying to port winsock application to socket.h in linux. Not yet finished.
