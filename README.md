@@ -8,4 +8,4 @@ have been trying to port the remains from winsock to socket.h in Mint.
 
 have not yet finished, but expected to wrap it up soon.
 
-sources for mptcp implementaion weigh 7 GBs. too much. i could install this on one of the machines, but i doubt if my small ssd would like it after copying them.
+api for mptcp lies somewhere in depth of hundreds of folders. sources for mptcp weigh 7 GBs. too much. i could install this on one of the machines, but i doubt if my small ssd would like it after copying them.
