@@ -30,12 +30,6 @@ char ChanPass[] = "pass";
 int Sock;
 bool Connected;
 
-
-unsigned int Resolve(char *host) {
-    return inet_addr(host);
-}
-
-
 char *GenerateLetterNick(int Len, int Sock) {
 
 	int r, i;
@@ -192,22 +186,10 @@ int Irc_Connect(char *Server, unsigned int Port, bool UsePassword, const char *P
 	Peer.sin_family = AF_INET;
 	Peer.sin_port = htons(Port);
 
-	if ((Peer.sin_addr.s_addr = Resolve(Server)) == 0) {
-
-		printf("Couldn't resolve irc server host!\n");
-		return 0;
-	}
-
 	Sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (Sock < 0) {
 
 		printf("Failed to initialize socket!\n");
-		return 0;
-	}
-
-	if (connect(Sock, &Peer, sizeof(Peer)) < 0) {
-
-		printf("Failed to connect to server!\n");
 		return 0;
 	}
 
@@ -351,13 +333,13 @@ int Irc_Parse(char *Line)
 
 
 
-int main()//ïåðåïèñàòü
+int main()
 {
 	//Initialization of variables
 	char Buffer[RECV_BUFFER_SIZE];
 	int Error = 0, len;
-	struct timeval tv;//
-	fd_set fds;//
+	struct timeval tv;
+	fd_set fds;
 	int nRetVal;
 
 	Connected = 0;
