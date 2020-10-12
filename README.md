@@ -13,7 +13,7 @@ api for mptcp lies somewhere in depth of hundreds of folders. sources for mptcp 
 in beta v.1.1 i've got a buildable valid socket app, but at the cost of disabling some functions crucial for real operation.
 
 in beta v1.2 i've tried to employ a tcp flood function. 
-realised that I don't need API for mptcp since it's lying above tcp. the kernel might do everything for me. 
+realised that I don't need api for mptcp since the kernel would do everything for me. 
 installing mptcp on the kernel has not succeeded. have been trying numerous linux distros, failed for different reasons. 
 and yes, mptcp source weighs about 800 mb., not 7 gb.
 in doubts about the workability of the bot. hasn't checked yet.
