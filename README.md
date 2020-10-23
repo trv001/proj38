@@ -18,4 +18,4 @@ installing mptcp on the kernel has not succeeded. have been trying numerous linu
 and yes, mptcp source weighs about 800 mb., not 7 gb.
 in doubts about the workability of the bot. hasn't checked yet.
 
-in beta v1.3 code was fully rewritten from scratch with multithreading support. main.cpp not finished.
+in beta v2.1 code was fully rewritten from scratch with multithreading support. main.cpp not finished.
