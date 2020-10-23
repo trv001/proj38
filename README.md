@@ -17,3 +17,5 @@ realised that I don't need api for mptcp since the kernel would do everything fo
 installing mptcp on the kernel has not succeeded. have been trying numerous linux distros, failed for different reasons. 
 and yes, mptcp source weighs about 800 mb., not 7 gb.
 in doubts about the workability of the bot. hasn't checked yet.
+
+in beta v1.3 code was fully rewritten from scratch.
