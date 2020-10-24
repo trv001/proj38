@@ -1,6 +1,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
-#inclde <arpa/inet.h>
+#include <arpa/inet.h>
 #include <cstdlib>
 #include <stdlib.h>
 
